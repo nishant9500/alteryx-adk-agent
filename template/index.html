@@ -1,0 +1,27 @@
+<!-- templates/index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Alteryx to BigQuery SQL Agent</title>
+  <style>
+    body { font-family: Arial; padding: 2em; background: #f9f9f9; }
+    textarea { width: 100%; height: 200px; margin-top: 10px; }
+    pre { background: #eee; padding: 1em; border-radius: 8px; }
+    button { margin-top: 1em; padding: 0.5em 1em; }
+  </style>
+</head>
+<body>
+  <h1>Paste Your Alteryx XML</h1>
+  <form method="post">
+    <textarea name="xml_input" placeholder="Paste .yxmd XML here">{{ xml_input or '' }}</textarea><br>
+    <button type="submit">Generate SQL</button>
+  </form>
+
+  {% if sql %}
+    <h2>Generated SQL</h2>
+    <pre>{{ sql }}</pre>
+  {% endif %}
+</body>
+</html>
