@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alteryx XML to BigQuery SQL Converter</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font for a clean look */
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        /* Basic styling for the main container */
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 1.5rem;
+            background-color: #ffffff;
+            border-radius: 0.75rem; /* Rounded corners */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        textarea {
+            min-height: 200px; /* Ensure text areas are tall enough */
+        }
+        /* Style for the message box */
+        .message-box {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+        .message-box.error {
+            background-color: #fee2e2; /* Light red */
+            color: #dc2626; /* Dark red */
+        }
+        .message-box.success {
+            background-color: #d1fae5; /* Light green */
+            color: #059669; /* Dark green */
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="container w-full">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Alteryx XML to BigQuery SQL Converter</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="alteryxXmlInput" class="block text-lg font-medium text-gray-700 mb-2">Alteryx XML Input:</label>
+                <textarea id="alteryxXmlInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm" placeholder="Paste your Alteryx XML code here..."></textarea>
+            </div>
+            <div>
+                <label for="bigquerySqlOutput" class="block text-lg font-medium text-gray-700 mb-2">BigQuery SQL Output:</label>
+                <textarea id="bigquerySqlOutput" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 focus:outline-none" readonly placeholder="Generated BigQuery SQL will appear here..."></textarea>
+            </div>
+        </div>
+
+        <div class="mt-6 flex flex-col sm:flex-row justify-center items-center gap-4">
+            <button id="convertButton" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                Convert to SQL
+            </button>
+            <button id="copyButton" class="px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition ease-in-out duration-150">
+                Copy SQL
+            </button>
+        </div>
+
+        <div id="messageBox" class="message-box hidden"></div>
+        <div id="loadingIndicator" class="hidden text-center text-blue-600 mt-4">
+            <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-2 text-gray-600">Converting... Please wait.</p>
+        </div>
+
+    </div>
+
+    <script>
+        // IMPORTANT: Replace this with your deployed Cloud Run Service URL
+        const CLOUD_RUN_SERVICE_URL = 'https://your-cloud-run-service-url.a.run.app/convert';
+
+        const alteryxXmlInput = document.getElementById('alteryxXmlInput');
+        const bigquerySqlOutput = document.getElementById('bigquerySqlOutput');
+        const convertButton = document.getElementById('convertButton');
+        const copyButton = document.getElementById('copyButton');
+        const messageBox = document.getElementById('messageBox');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        // Function to display messages
+        function showMessage(message, type) {
+            messageBox.textContent = message;
+            messageBox.className = `message-box ${type}`; // Apply type class (e.g., 'success', 'error')
+            messageBox.classList.remove('hidden');
+        }
+
+        // Function to hide messages
+        function hideMessage() {
+            messageBox.classList.add('hidden');
+            messageBox.textContent = '';
+        }
+
+        convertButton.addEventListener('click', async () => {
+            hideMessage(); // Clear previous messages
+            bigquerySqlOutput.value = ''; // Clear previous output
+            loadingIndicator.classList.remove('hidden'); // Show loading indicator
+            convertButton.disabled = true; // Disable button during processing
+
+            const alteryxXml = alteryxXmlInput.value.trim();
+
+            if (!alteryxXml) {
+                showMessage('Please paste Alteryx XML into the input field.', 'error');
+                loadingIndicator.classList.add('hidden');
+                convertButton.disabled = false;
+                return;
+            }
+
+            try {
+                const response = await fetch(CLOUD_RUN_SERVICE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ alteryx_xml: alteryxXml }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    bigquerySqlOutput.value = result.sql || 'No SQL generated.';
+                    showMessage(result.message || 'Conversion successful!', 'success');
+                } else {
+                    // Handle server-side errors (e.g., 400, 500)
+                    const errorMessage = result.message || 'An unknown error occurred during conversion.';
+                    showMessage(`Error: ${errorMessage}`, 'error');
+                    bigquerySqlOutput.value = ''; // Clear output on error
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showMessage(`Network or server error: ${error.message}`, 'error');
+                bigquerySqlOutput.value = ''; // Clear output on error
+            } finally {
+                loadingIndicator.classList.add('hidden'); // Hide loading indicator
+                convertButton.disabled = false; // Re-enable button
+            }
+        });
+
+        copyButton.addEventListener('click', () => {
+            if (bigquerySqlOutput.value) {
+                // Use document.execCommand('copy') for better iframe compatibility
+                bigquerySqlOutput.select();
+                try {
+                    document.execCommand('copy');
+                    showMessage('SQL copied to clipboard!', 'success');
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                    showMessage('Failed to copy SQL. Please copy manually.', 'error');
+                }
+            } else {
+                showMessage('No SQL to copy.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
